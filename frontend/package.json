@@ -1,0 +1,42 @@
+{
+  "name": "bitrs-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frontend UI for BitRS distributed exchange",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^2.8.0",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@solana/wallet-adapter-base": "^0.9.23",
+    "@solana/wallet-adapter-react": "^0.15.34",
+    "@solana/wallet-adapter-react-ui": "^0.9.33",
+    "@solana/wallet-adapter-wallets": "^0.19.20",
+    "@solana/web3.js": "^1.78.4",
+    "axios": "^1.5.0",
+    "bignumber.js": "^9.1.2",
+    "date-fns": "^2.30.0",
+    "framer-motion": "^10.16.1",
+    "lightweight-charts": "^4.0.1",
+    "next": "13.4.19",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-hook-form": "^7.45.4",
+    "react-icons": "^4.10.1",
+    "react-query": "^3.39.3",
+    "zustand": "^4.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.5.7",
+    "@types/react": "18.2.21",
+    "@types/react-dom": "18.2.7",
+    "eslint": "8.48.0",
+    "eslint-config-next": "13.4.19",
+    "typescript": "5.2.2"
+  }
+}
