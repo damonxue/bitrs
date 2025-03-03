@@ -4,8 +4,9 @@ use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};
 use crate::tokenomics::TokenEconomics;
 use crate::models::{TokenValidation, RewardValidation, BuybackValidation};
+use crate::ws::WsServer;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SystemMetrics {
     pub timestamp: DateTime<Utc>,
     pub total_volume_24h: u64,
@@ -16,7 +17,7 @@ pub struct SystemMetrics {
     pub avg_apr: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct PoolMetrics {
     pub pool_id: String,
     pub volume_24h: u64,
@@ -30,10 +31,11 @@ pub struct Analytics {
     token_economics: Arc<TokenEconomics>,
     metrics: Arc<RwLock<SystemMetrics>>,
     pool_metrics: Arc<RwLock<Vec<PoolMetrics>>>,
+    ws_server: Arc<WsServer>,
 }
 
 impl Analytics {
-    pub fn new(token_economics: Arc<TokenEconomics>) -> Self {
+    pub fn new(token_economics: Arc<TokenEconomics>, ws_server: Arc<WsServer>) -> Self {
         Self {
             token_economics,
             metrics: Arc::new(RwLock::new(SystemMetrics {
@@ -46,6 +48,7 @@ impl Analytics {
                 avg_apr: 0.0,
             })),
             pool_metrics: Arc::new(RwLock::new(Vec::new())),
+            ws_server,
         }
     }
 
@@ -53,6 +56,7 @@ impl Analytics {
         let metrics = self.metrics.clone();
         let pool_metrics = self.pool_metrics.clone();
         let token_economics = self.token_economics.clone();
+        let ws_server = self.ws_server.clone();
 
         tokio::spawn(async move {
             loop {
@@ -60,6 +64,7 @@ impl Analytics {
                     metrics.clone(),
                     pool_metrics.clone(),
                     token_economics.clone(),
+                    ws_server.clone(),
                 ).await {
                     log::error!("Error updating metrics: {}", e);
                 }
@@ -72,6 +77,7 @@ impl Analytics {
         metrics: Arc<RwLock<SystemMetrics>>,
         pool_metrics: Arc<RwLock<Vec<PoolMetrics>>>,
         token_economics: Arc<TokenEconomics>,
+        ws_server: Arc<WsServer>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Update system-wide metrics
         let mut current_metrics = metrics.write().await;
@@ -83,15 +89,21 @@ impl Analytics {
 
         // Add pool metrics collection logic here
         // This would involve querying each pool's state
+        
+        // Broadcast updated metrics
+        let metrics_clone = current_metrics.clone();
+        ws_server.broadcast_metrics(metrics_clone);
 
         Ok(())
     }
 
     pub async fn get_system_metrics(&self) -> SystemMetrics {
+        // Clone the data inside the lock to avoid returning a reference to locked data
         self.metrics.read().await.clone()
     }
 
     pub async fn get_pool_metrics(&self) -> Vec<PoolMetrics> {
+        // Clone the data inside the lock to avoid returning a reference to locked data
         self.pool_metrics.read().await.clone()
     }
 

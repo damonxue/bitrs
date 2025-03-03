@@ -3,6 +3,7 @@ use tokio::sync::RwLock;
 use solana_sdk::{
     pubkey::Pubkey,
     transaction::Transaction,
+    instruction::Instruction,
 };
 use crate::tokenomics::TokenEconomics;
 
@@ -49,8 +50,8 @@ impl RewardHandler {
 
         // Process rewards for each block we missed
         for block_height in *last_block..=current_block {
-            // Calculate mining rewards
-            let reward = token_economics.calculate_mining_reward(block_height).await;
+            // Calculate mining rewards - no longer async
+            let reward = token_economics.calculate_mining_reward(block_height);
             
             // Distribute rewards to active liquidity providers
             if reward > 0 {
@@ -75,7 +76,7 @@ impl RewardHandler {
         let active_lps = Self::get_active_liquidity_providers().await?;
         
         for lp in active_lps {
-            if let Some(tx) = token_economics
+            if let Some(instructions) = token_economics
                 .distribute_mining_rewards(
                     lp.address,
                     lp.staked_amount,
@@ -85,6 +86,7 @@ impl RewardHandler {
             {
                 // Submit reward transaction
                 // Implementation would depend on your transaction submission system
+                log::info!("Generated reward instructions for LP: {}", lp.address);
             }
         }
 
@@ -98,9 +100,13 @@ impl RewardHandler {
         let buyback_amount = Self::get_accumulated_buyback_fees().await?;
         
         if buyback_amount > 0 {
-            let tx = token_economics.create_buyback_transaction(buyback_amount);
+            // Updated to use create_buyback_instructions instead of create_buyback_transaction
+            let buyback_instructions = token_economics
+                .create_buyback_instructions(buyback_amount);
+                
             // Submit buyback transaction
             // Implementation would depend on your transaction submission system
+            log::info!("Generated buyback instructions for {} tokens", buyback_amount);
         }
 
         Ok(())

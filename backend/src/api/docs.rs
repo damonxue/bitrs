@@ -46,7 +46,7 @@ use utoipa_swagger_ui::SwaggerUi;
     ),
     info(
         title = "BitRS DEX API",
-        version = env!("CARGO_PKG_VERSION"),
+        version = "0.1.0",
         description = "基于Solana的分布式交易所(DEX)API",
         contact(
             name = "BitRS Team",

@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::solana::SolanaClientType;
+use crate::{AppState, buyback::BuybackManager};
 
 // API子模块导出
 pub mod orderbook;
@@ -11,16 +12,7 @@ pub mod bridge;
 pub mod rewards;
 pub mod analytics;
 
-/// 应用全局状态，在各个API处理函数间共享
-pub struct AppState {
-    /// Solana客户端
-    pub solana_client: SolanaClientType,
-    /// 应用配置
-    pub config: Config,
-}
-
 use actix_web::{get, web, HttpResponse, Responder};
-use crate::AppState;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -41,9 +33,13 @@ async fn get_buyback_stats(state: web::Data<AppState>) -> impl Responder {
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/v1")
+            .service(get_buyback_stats)
             .configure(amm::init_routes)
             .configure(bridge::init_routes)
             .configure(rewards::init_routes)
             .configure(analytics::init_routes)
+            .configure(orderbook::init_routes)
+            .configure(assets::init_routes)
+            .configure(trades::init_routes)
     );
 }

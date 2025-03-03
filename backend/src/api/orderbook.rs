@@ -1,71 +1,91 @@
+use actix_web::{get, post, web, HttpResponse, Responder};
+use serde::{Deserialize, Serialize};
+use solana_sdk::pubkey::Pubkey;
+use std::str::FromStr;
+use log::{info};
 use crate::{
     api::AppState,
     errors::ApiError,
-    models::{OrderBook, Order, OrderRequest, Market, OrderSide},
+    models::{Order, OrderBook, OrderRequest, OrderSide, Market},
 };
-use actix_web::{web, HttpResponse, Responder};
-use solana_sdk::pubkey::Pubkey;
-use std::str::FromStr;
-use log::{info, error};
+use uuid::Uuid;
 
-/// 获取指定市场的订单簿数据
+/// 获取可用交易对列表
+#[get("/markets")]
+pub async fn get_markets(
+    app_state: web::Data<AppState>,
+) -> Result<impl Responder, ApiError> {
+    info!("获取交易对列表");
+    
+    // 在实际项目中，应该查询链上数据获取交易对列表
+    // 这里使用模拟数据作为示例
+    
+    let markets = vec![
+        Market {
+            market_id: "SOL-USDC".to_string(),
+            base_token: "So11111111111111111111111111111111111111112".to_string(),
+            quote_token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            base_decimals: 9,
+            quote_decimals: 6,
+        },
+        Market {
+            market_id: "BTC-USDC".to_string(),
+            base_token: "9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E".to_string(),
+            quote_token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            base_decimals: 8,
+            quote_decimals: 6,
+        },
+    ];
+    
+    Ok(HttpResponse::Ok().json(markets))
+}
+
+/// 获取指定交易对的订单簿
+#[get("/orderbook/{market_id}")]
 pub async fn get_orderbook(
     market_id: web::Path<String>,
     app_state: web::Data<AppState>,
 ) -> Result<impl Responder, ApiError> {
     info!("获取订单簿: {}", market_id);
     
-    let solana_client = match &app_state.solana_client {
-        Some(client) => client,
-        None => return Err(ApiError::SolanaError("未连接到Solana节点".to_string())),
-    };
+    // 在实际项目中，应该根据程序ID查询链上数据
+    // 这里使用模拟数据作为示例
     
-    // 解析市场ID为Pubkey
-    let market_id_pubkey = Pubkey::from_str(&market_id)
-        .map_err(|_| ApiError::BadRequest("无效的市场ID格式".to_string()))?;
-    
-    // 查找订单簿账户地址
-    let program_id = Pubkey::from_str(&app_state.config.orderbook_program_id)
-        .map_err(|_| ApiError::BadRequest("无效的程序ID格式".to_string()))?;
-    
-    // 理论上这里应当查询链上数据，将链上的Order结构反序列化为API模型
-    // 简化版实现，实际项目中需要接入真实数据
-    
-    // 模拟一些订单数据作为示例
+    // 模拟订单簿数据
     let bids = vec![
         Order {
-            order_id: "bid1".to_string(),
-            price: 50.0,
-            size: 2.0,
+            order_id: "bid-1".to_string(),
+            price: 50.25,
+            size: 2.5,
             side: OrderSide::Buy,
-            user: "user1".to_string(),
+            user: "user-1".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
         },
         Order {
-            order_id: "bid2".to_string(),
-            price: 49.5,
-            size: 3.0,
+            order_id: "bid-2".to_string(),
+            price: 50.15,
+            size: 1.8,
             side: OrderSide::Buy,
-            user: "user2".to_string(),
+            user: "user-2".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
         },
     ];
     
     let asks = vec![
         Order {
-            order_id: "ask1".to_string(),
-            price: 50.5,
-            size: 1.5,
+            order_id: "ask-1".to_string(),
+            price: 50.35,
+            size: 1.2,
             side: OrderSide::Sell,
-            user: "user3".to_string(),
+            user: "user-3".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
         },
         Order {
-            order_id: "ask2".to_string(),
-            price: 51.0,
-            size: 4.0,
+            order_id: "ask-2".to_string(),
+            price: 50.45,
+            size: 3.0,
             side: OrderSide::Sell,
-            user: "user4".to_string(),
+            user: "user-4".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
         },
     ];
@@ -79,82 +99,74 @@ pub async fn get_orderbook(
     Ok(HttpResponse::Ok().json(orderbook))
 }
 
-/// 获取所有可用交易市场信息
-pub async fn get_markets(
-    app_state: web::Data<AppState>,
-) -> Result<impl Responder, ApiError> {
-    info!("获取市场列表");
-    
-    // 模拟一些市场数据作为示例
-    let markets = vec![
-        Market {
-            market_id: "SOL-USDC".to_string(),
-            base_token: "So11111111111111111111111111111111111111112".to_string(),
-            quote_token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
-            base_decimals: 9,
-            quote_decimals: 6,
-        },
-        Market {
-            market_id: "BTC-USDC".to_string(),
-            base_token: "9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E".to_string(),
-            quote_token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
-            base_decimals: 6,
-            quote_decimals: 6,
-        },
-    ];
-    
-    Ok(HttpResponse::Ok().json(markets))
-}
-
-/// 提交新订单
+/// 下单接口
+#[post("/order")]
 pub async fn place_order(
     order_req: web::Json<OrderRequest>,
-    app_state: web::Data<AppState>,
+    _app_state: web::Data<AppState>,
 ) -> Result<impl Responder, ApiError> {
-    info!("提交订单: {:?}", order_req);
+    info!("下单请求: {:?}", order_req);
     
-    let solana_client = match &app_state.solana_client {
-        Some(client) => client,
-        None => return Err(ApiError::SolanaError("未连接到Solana节点".to_string())),
+    // 在实际项目中，这里应该:
+    // 1. 验证签名
+    // 2. 检查用户余额
+    // 3. 将订单提交到链上
+    // 4. 返回交易哈希
+    
+    // 模拟处理，返回交易哈希
+    let tx_hash = format!("simulation_tx_{}", Uuid::new_v4());
+    
+    #[derive(Serialize)]
+    struct OrderResponse {
+        success: bool,
+        tx_hash: String,
+        message: String,
+    }
+    
+    let response = OrderResponse {
+        success: true,
+        tx_hash,
+        message: "Order submitted successfully".to_string(),
     };
     
-    // 在实际项目中，这里需要:
-    // 1. 验证订单签名
-    // 2. 构造Solana交易
-    // 3. 发送交易到链上
-    // 4. 返回交易ID
-
-    // 简化版模拟响应
-    let tx_hash = format!("simulation_tx_{}", uuid::Uuid::new_v4());
-    
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "success": true,
-        "tx_hash": tx_hash,
-    })))
+    Ok(HttpResponse::Ok().json(response))
 }
 
-/// 取消现有订单
+/// 取消订单接口
+#[post("/cancel/{order_id}")]
 pub async fn cancel_order(
     order_id: web::Path<String>,
-    app_state: web::Data<AppState>,
+    _app_state: web::Data<AppState>,
 ) -> Result<impl Responder, ApiError> {
     info!("取消订单: {}", order_id);
     
-    let solana_client = match &app_state.solana_client {
-        Some(client) => client,
-        None => return Err(ApiError::SolanaError("未连接到Solana节点".to_string())),
+    // 在实际项目中，这里应该:
+    // 1. 验证用户是订单所有者
+    // 2. 向链上提交取消订单指令
+    // 3. 返回交易哈希
+    
+    // 模拟处理，返回交易哈希
+    let tx_hash = format!("cancel_tx_{}", Uuid::new_v4());
+    
+    #[derive(Serialize)]
+    struct CancelResponse {
+        success: bool,
+        tx_hash: String,
+        order_id: String,
+    }
+    
+    let response = CancelResponse {
+        success: true,
+        tx_hash,
+        order_id: order_id.to_string(),
     };
     
-    // 在实际项目中，这里需要:
-    // 1. 构造取消订单的Solana交易
-    // 2. 发送交易到链上
-    // 3. 返回交易ID
-    
-    // 简化版模拟响应
-    let tx_hash = format!("cancel_tx_{}", uuid::Uuid::new_v4());
-    
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "success": true,
-        "tx_hash": tx_hash,
-    })))
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub fn init_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(get_markets)
+       .service(get_orderbook)
+       .service(place_order)
+       .service(cancel_order);
 }

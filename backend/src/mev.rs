@@ -1,5 +1,5 @@
 use std::time::{SystemTime, UNIX_EPOCH};
-use ring::digest::{Context, SHA256};
+use sha2::{Sha256, Digest};
 use std::collections::VecDeque;
 use tokio::sync::Mutex;
 use std::sync::Arc;
@@ -53,16 +53,19 @@ impl FairOrderQueue {
 
     // Reveal order and verify commitment
     pub async fn reveal_order(&self, order_data: &[u8], nonce: &[u8]) -> Result<bool, String> {
-        let mut context = Context::new(&SHA256);
-        context.update(order_data);
-        context.update(nonce);
-        let order_hash = context.finish();
+        let mut hasher = Sha256::new();
+        hasher.update(order_data);
+        hasher.update(nonce);
+        let result = hasher.finalize();
+        
+        let mut order_hash = [0u8; 32];
+        order_hash.copy_from_slice(&result[..]);
 
         let mut queue = self.queue.lock().await;
         
         // Find and verify the commitment
         for committed in queue.iter_mut() {
-            if committed.order_hash == order_hash.as_ref() && !committed.revealed {
+            if committed.order_hash == order_hash && !committed.revealed {
                 committed.revealed = true;
                 return Ok(true);
             }
@@ -97,16 +100,16 @@ impl FairOrderQueue {
 
         // Randomize order execution sequence using current batch as entropy
         if !batch.is_empty() {
-            let mut context = Context::new(&SHA256);
+            let mut hasher = Sha256::new();
             for hash in &batch {
-                context.update(hash);
+                hasher.update(hash);
             }
-            context.update(&current_time.to_be_bytes());
-            let batch_seed = context.finish();
+            hasher.update(&current_time.to_be_bytes());
+            let result = hasher.finalize();
             
-            // Use batch_seed to shuffle the batch
+            // Use result to shuffle the batch
             for i in (1..batch.len()).rev() {
-                let j = batch_seed.as_ref()[i % 32] as usize % (i + 1);
+                let j = result[i % 32] as usize % (i + 1);
                 batch.swap(i, j);
             }
         }
@@ -129,13 +132,13 @@ impl FairOrderQueue {
         Ok(true)
     }
 
-    async fn detect_suspicious_pattern(order_data: &[u8]) -> bool {
+    async fn detect_suspicious_pattern(_order_data: &[u8]) -> bool {
         // Implementation of pattern detection
         // This would analyze recent orders for sandwich attack patterns
         false
     }
 
-    fn extract_order_value(order_data: &[u8]) -> u64 {
+    fn extract_order_value(_order_data: &[u8]) -> u64 {
         // Implementation of order value extraction
         0
     }
@@ -211,15 +214,15 @@ impl FairOrderQueue {
             .unwrap()
             .as_millis() as u64;
 
-        let mut context = Context::new(&SHA256);
+        let mut hasher = Sha256::new();
         for hash in batch.iter() {
-            context.update(hash);
+            hasher.update(hash);
         }
-        context.update(&current_time.to_be_bytes());
-        let batch_seed = context.finish();
+        hasher.update(&current_time.to_be_bytes());
+        let result = hasher.finalize();
 
         for i in (1..batch.len()).rev() {
-            let j = batch_seed.as_ref()[i % 32] as usize % (i + 1);
+            let j = result[i % 32] as usize % (i + 1);
             batch.swap(i, j);
         }
     }

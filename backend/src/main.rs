@@ -1,7 +1,8 @@
-use actix_web::{App, HttpServer, middleware::Logger, web};
+use actix_web::{App, HttpServer, middleware::Logger, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use std::sync::Arc;
 use solana_sdk::pubkey::Pubkey;
+use std::str::FromStr;
 
 mod api;
 mod tokenomics;
@@ -16,6 +17,9 @@ mod config;
 mod models;
 mod solana;
 mod ws;
+mod cross_chain_monitor;
+mod order_router;
+mod price_monitor;
 
 use crate::{
     tokenomics::TokenEconomics,
@@ -25,6 +29,7 @@ use crate::{
     middleware::MonitoringMiddleware,
     config::Config,
     ws::WsServer,
+    solana::SolanaClientType,
 };
 
 pub struct AppState {
@@ -33,13 +38,14 @@ pub struct AppState {
     analytics: Arc<Analytics>,
     config: Arc<Config>,
     ws_server: Arc<WsServer>,
+    solana_client: SolanaClientType,
 }
 
 async fn ws_handler(
-    req: web::HttpRequest,
+    req: HttpRequest,
     stream: web::Payload,
     data: web::Data<AppState>,
-) -> Result<web::HttpResponse, actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let ws_session = data.ws_server.create_session();
     ws::start(ws_session, &req, stream)
 }
@@ -52,12 +58,24 @@ async fn main() -> std::io::Result<()> {
     let config = Arc::new(Config::load().expect("Failed to load configuration"));
     log::info!("Configuration loaded successfully");
 
+    // Initialize Solana client
+    let solana_client = solana::create_client(&config.solana.rpc_url)
+        .await
+        .expect("Failed to initialize Solana client");
+    
     // Initialize WebSocket server
     let ws_server = Arc::new(WsServer::new());
 
     // Initialize components
-    let treasury = Pubkey::new_unique(); // Replace with actual treasury pubkey
-    let dex_token_mint = Pubkey::new_unique(); // Replace with actual token mint
+    let treasury = match Pubkey::from_str(&config.tokenomics.treasury_address) {
+        Ok(pubkey) => pubkey,
+        Err(_) => Pubkey::new_unique() // Fallback for development
+    };
+    
+    let dex_token_mint = match Pubkey::from_str(&config.tokenomics.token_mint_address) {
+        Ok(pubkey) => pubkey,
+        Err(_) => Pubkey::new_unique() // Fallback for development
+    };
 
     // Initialize TokenEconomics
     let token_economics = Arc::new(TokenEconomics::new(
@@ -91,6 +109,7 @@ async fn main() -> std::io::Result<()> {
         analytics: analytics.clone(),
         config: config.clone(),
         ws_server: ws_server.clone(),
+        solana_client: solana_client.clone(),
     });
 
     // Initialize monitoring middleware

@@ -2,6 +2,7 @@ use solana_sdk::{
     pubkey::Pubkey,
     system_instruction,
     transaction::Transaction,
+    instruction::Instruction,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -32,7 +33,7 @@ impl TokenEconomics {
     }
 
     // Calculate mining rewards based on block height
-    pub async fn calculate_mining_reward(&self, block_height: u64) -> u64 {
+    pub fn calculate_mining_reward(&self, block_height: u64) -> u64 {
         let halvings = block_height / REWARD_HALVING_PERIOD;
         if halvings >= 64 {
             return 0;
@@ -45,31 +46,31 @@ impl TokenEconomics {
         &self,
         trade_volume: u64,
         lp_address: Pubkey,
-    ) -> Vec<Transaction> {
-        let mut transactions = Vec::new();
+    ) -> Vec<Vec<Instruction>> {
+        let mut instructions_vec = Vec::new();
 
         // Calculate fee shares
         let lp_fee = (trade_volume as f64 * LP_FEE_SHARE) as u64;
         let buyback_fee = (trade_volume as f64 * BUYBACK_SHARE) as u64;
 
-        // Create LP reward transaction
+        // Create LP reward instructions
         if lp_fee > 0 {
-            transactions.push(Transaction::new_with_payer(
-                &[system_instruction::transfer(
+            instructions_vec.push(vec![
+                system_instruction::transfer(
                     &self.treasury,
                     &lp_address,
                     lp_fee,
-                )],
-                Some(&self.treasury),
-            ));
+                )
+            ]);
         }
 
-        // Create buyback and burn transaction
+        // Create buyback and burn instructions
         if buyback_fee > 0 {
-            transactions.push(self.create_buyback_transaction(buyback_fee));
+            let buyback_instructions = self.create_buyback_instructions(buyback_fee);
+            instructions_vec.push(buyback_instructions);
         }
 
-        transactions
+        instructions_vec
     }
 
     // Handle liquidity mining rewards
@@ -78,9 +79,9 @@ impl TokenEconomics {
         lp_address: Pubkey,
         staked_amount: u64,
         duration: u64,
-    ) -> Option<Transaction> {
+    ) -> Option<Vec<Instruction>> {
         let current_block = *self.current_block.read().await;
-        let reward = self.calculate_mining_reward(current_block).await;
+        let reward = self.calculate_mining_reward(current_block);
         
         if reward == 0 {
             return None;
@@ -91,24 +92,32 @@ impl TokenEconomics {
         let actual_reward = (reward as f64 * stake_weight as f64 / 1_000_000.0) as u64;
 
         if actual_reward > 0 {
-            Some(Transaction::new_with_payer(
-                &[system_instruction::transfer(
+            Some(vec![
+                system_instruction::transfer(
                     &self.treasury,
                     &lp_address,
                     actual_reward,
-                )],
-                Some(&self.treasury),
-            ))
+                )
+            ])
         } else {
             None
         }
     }
 
     // Handle token buyback and burn
-    fn create_buyback_transaction(&self, amount: u64) -> Transaction {
-        // Create a transaction to buy tokens from the market and burn them
-        // This would interact with the AMM to buy tokens and then burn them
-        Transaction::new_with_payer(&[], Some(&self.treasury)) // Placeholder
+    fn create_buyback_instructions(&self, amount: u64) -> Vec<Instruction> {
+        // In a real implementation, this would contain instructions to:
+        // 1. Buy tokens from the market
+        // 2. Burn the tokens using token program
+        
+        // For now, we'll use a placeholder instruction
+        vec![
+            system_instruction::transfer(
+                &self.treasury,
+                &self.dex_token_mint,  // In reality, this would be a different instruction
+                amount,
+            )
+        ]
     }
 
     // Update circulating supply

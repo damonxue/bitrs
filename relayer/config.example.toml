@@ -1,0 +1,43 @@
+# BitRS Relayer配置文件示例
+
+[ethereum]
+rpc_url = "https://mainnet.infura.io/v3/YOUR_API_KEY"
+ws_url = "wss://mainnet.infura.io/ws/v3/YOUR_API_KEY"
+required_confirmations = 12
+trusted_contracts = [
+    "0x1234567890123456789012345678901234567890",
+    "0x0987654321098765432109876543210987654321"
+]
+gas_price_multiplier = 1.2
+max_retries = 3
+retry_interval_ms = 1000
+
+[solana]
+rpc_url = "https://api.mainnet-beta.solana.com"
+ws_url = "wss://api.mainnet-beta.solana.com"
+required_confirmations = 32
+trusted_programs = [
+    "Bridge1111111111111111111111111111111111111",
+    "TokenSwap11111111111111111111111111111111111"
+]
+commitment = "finalized"
+max_retries = 3
+retry_interval_ms = 500
+
+[bsc]
+rpc_url = "https://bsc-dataseed.binance.org/"
+ws_url = "wss://bsc-ws-node.nariox.org:443"
+required_confirmations = 15
+trusted_contracts = [
+    "0xABCDEF1234567890ABCDEF1234567890ABCDEF12",
+    "0x123456ABCDEF7890123456ABCDEF7890123456AB"
+]
+gas_price_multiplier = 1.1
+max_retries = 3
+retry_interval_ms = 800
+
+[general]
+log_level = "info"
+metrics_port = 9091
+health_check_port = 8081
+event_queue_size = 1000

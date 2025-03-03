@@ -5,13 +5,13 @@ use serde::Serialize;
 use tokio::sync::broadcast;
 use crate::analytics::{SystemMetrics, PoolMetrics};
 
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct MetricsUpdate(SystemMetrics);
+pub struct MetricsUpdate(pub SystemMetrics);
 
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct PoolUpdate(PoolMetrics);
+pub struct PoolUpdate(pub PoolMetrics);
 
 pub struct MetricsWsSession {
     metrics_tx: broadcast::Sender<MetricsUpdate>,
@@ -24,27 +24,44 @@ impl Actor for MetricsWsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         // Subscribe to metrics updates
         let mut metrics_rx = self.metrics_tx.subscribe();
-        let mut pool_rx = self.pool_tx.subscribe();
+        let addr = ctx.address();
         
         // Handle metrics updates
-        ctx.spawn(
-            async move {
-                while let Ok(update) = metrics_rx.recv().await {
-                    // Send metrics update to client
-                }
+        actix::spawn(async move {
+            while let Ok(update) = metrics_rx.recv().await {
+                addr.do_send(update);
             }
-            .into_actor(self),
-        );
+        });
 
         // Handle pool updates
-        ctx.spawn(
-            async move {
-                while let Ok(update) = pool_rx.recv().await {
-                    // Send pool update to client
-                }
+        let mut pool_rx = self.pool_tx.subscribe();
+        let addr = ctx.address();
+        
+        actix::spawn(async move {
+            while let Ok(update) = pool_rx.recv().await {
+                addr.do_send(update);
             }
-            .into_actor(self),
-        );
+        });
+    }
+}
+
+impl Handler<MetricsUpdate> for MetricsWsSession {
+    type Result = ();
+
+    fn handle(&mut self, msg: MetricsUpdate, ctx: &mut Self::Context) {
+        if let Ok(json) = serde_json::to_string(&msg.0) {
+            ctx.text(json);
+        }
+    }
+}
+
+impl Handler<PoolUpdate> for MetricsWsSession {
+    type Result = ();
+
+    fn handle(&mut self, msg: PoolUpdate, ctx: &mut Self::Context) {
+        if let Ok(json) = serde_json::to_string(&msg.0) {
+            ctx.text(json);
+        }
     }
 }
 

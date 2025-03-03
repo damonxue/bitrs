@@ -7,7 +7,7 @@ use actix_web::{web, HttpResponse, Responder};
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use log::{info, error};
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post};
 use crate::tokenomics::TokenEconomics;
 use std::sync::Arc;
 
@@ -15,8 +15,8 @@ pub struct AmmState {
     token_economics: Arc<TokenEconomics>,
 }
 
-#[get("/pools")]
-async fn get_pools(state: web::Data<AmmState>) -> impl Responder {
+#[get("/pools/list")]
+async fn list_pools(state: web::Data<AmmState>) -> impl Responder {
     HttpResponse::Ok().json("List of liquidity pools")
 }
 
@@ -84,10 +84,13 @@ struct AddLiquidityRequest {
 }
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_pools);
+    cfg.service(list_pools);
     cfg.service(swap);
     cfg.service(add_liquidity);
     cfg.service(get_pool_apr);
+    cfg.route("/pools", web::get().to(get_pools));
+    cfg.route("/pool/{pool_id}", web::get().to(get_pool));
+    cfg.route("/quote", web::post().to(get_swap_quote));
 }
 
 /// 获取所有可用AMM流动性池信息

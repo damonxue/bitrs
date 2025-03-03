@@ -1,51 +1,53 @@
 use anchor_client::{Client, Cluster, Program};
+use anchor_lang::AccountDeserialize;
 use anyhow::{Result, anyhow};
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcTransactionConfig, RpcSendTransactionConfig},
 };
 use solana_sdk::{
-    commitment_config::CommitmentConfig,
+    commitment_config::{CommitmentConfig, CommitmentLevel},
     pubkey::Pubkey,
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
+use solana_transaction_status::UiTransactionStatusMeta;
+use solana_account_decoder::UiAccountData;
 use tokio::sync::RwLock;
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::str::FromStr;
 
 /// Solana客户端接口类型
-pub type SolanaClientType = Option<RpcClient>;
+pub type SolanaClientType = Option<Arc<RpcClient>>;
 
 /// 创建连接到Solana节点的RPC客户端
 pub async fn create_client(rpc_url: &str) -> Result<SolanaClientType> {
-    let client = RpcClient::new_with_commitment(
+    let client = Arc::new(RpcClient::new_with_commitment(
         rpc_url.to_string(),
         CommitmentConfig::confirmed(),
-    );
+    ));
     
     // 尝试获取区块高度以验证连接
-    match client.get_block_height().await {
+    match client.get_block_height() {
         Ok(_) => Ok(Some(client)),
         Err(e) => Err(anyhow!("Failed to connect to Solana node: {}", e)),
     }
 }
 
 /// 创建Anchor程序客户端，用于与合约交互
-pub fn create_program_client(
+pub fn create_program_client<C>(
     rpc_url: &str,
     payer: &Keypair,
     program_id: &str,
-) -> Result<Program> {
+) -> Result<Program<C>> {
     let program_id = Pubkey::from_str(program_id)
         .map_err(|e| anyhow!("Invalid program ID: {}", e))?;
     
     let cluster = Cluster::Custom(rpc_url.to_string(), rpc_url.to_string());
     let client = Client::new_with_options(
         cluster,
-        Rc::new(payer.clone()),
+        payer.clone(),
         CommitmentConfig::confirmed(),
     );
     
@@ -53,11 +55,11 @@ pub fn create_program_client(
 }
 
 /// 获取账户数据
-pub async fn get_account<T: anchor_client::AccountDeserialize>(
+pub async fn get_account<T: AccountDeserialize>(
     client: &RpcClient,
     address: &Pubkey,
 ) -> Result<T> {
-    let account = client.get_account(address).await
+    let account = client.get_account(address)
         .map_err(|e| anyhow!("Failed to fetch account data: {}", e))?;
     
     let mut data = account.data.as_slice();
@@ -88,9 +90,16 @@ pub struct TransactionStatus {
 
 impl SolanaService {
     pub fn new(config: Arc<crate::config::Config>) -> Self {
+        let commitment = match config.solana.commitment.as_str() {
+            "processed" => CommitmentConfig::processed(),
+            "confirmed" => CommitmentConfig::confirmed(),
+            "finalized" => CommitmentConfig::finalized(),
+            _ => CommitmentConfig::confirmed(), // default
+        };
+
         let rpc_client = Arc::new(RpcClient::new_with_commitment(
             config.solana.rpc_url.clone(),
-            CommitmentConfig::confirmed(),
+            commitment,
         ));
 
         Self {
@@ -105,11 +114,19 @@ impl SolanaService {
         transaction: Transaction,
         retry_count: u8,
     ) -> Result<String, Box<dyn std::error::Error>> {
+        let commitment_level = match self.config.solana.commitment.as_str() {
+            "processed" => CommitmentLevel::Processed,
+            "confirmed" => CommitmentLevel::Confirmed,
+            "finalized" => CommitmentLevel::Finalized,
+            _ => CommitmentLevel::Confirmed,
+        };
+
         let config = RpcSendTransactionConfig {
             skip_preflight: false,
-            preflight_commitment: Some(self.config.solana.commitment.clone()),
+            preflight_commitment: Some(commitment_level),
             encoding: None,
             max_retries: Some(retry_count as usize),
+            min_context_slot: None,
         };
 
         let signature = self.rpc_client.send_transaction_with_config(
@@ -133,9 +150,16 @@ impl SolanaService {
         &self,
         signature: &str,
     ) -> Result<TransactionStatus, Box<dyn std::error::Error>> {
+        let commitment = match self.config.solana.commitment.as_str() {
+            "processed" => CommitmentConfig::processed(),
+            "confirmed" => CommitmentConfig::confirmed(),
+            "finalized" => CommitmentConfig::finalized(),
+            _ => CommitmentConfig::confirmed(),
+        };
+
         let config = RpcTransactionConfig {
             encoding: None,
-            commitment: Some(self.config.solana.commitment.clone()),
+            commitment: Some(commitment),
             max_supported_transaction_version: None,
         };
 
@@ -146,12 +170,12 @@ impl SolanaService {
 
         let transaction_status = TransactionStatus {
             signature: signature.to_string(),
-            status: if status.meta.unwrap().err.is_none() {
+            status: if status.transaction.meta.as_ref().and_then(|m| m.err).is_none() {
                 "confirmed".to_string()
             } else {
                 "failed".to_string()
             },
-            confirmations: status.transaction.meta.unwrap().confirmations.unwrap_or(0),
+            confirmations: status.transaction.meta.as_ref().and_then(|m| m.confirmations).unwrap_or(0),
             timestamp: status.block_time.unwrap_or(0),
         };
 
@@ -167,7 +191,8 @@ impl SolanaService {
         token_account: &Pubkey,
     ) -> Result<u64, Box<dyn std::error::Error>> {
         let account = self.rpc_client.get_token_account_balance(token_account)?;
-        Ok(account.ui_amount_u64())
+        // Convert the UI amount to u64 based on decimals
+        Ok(account.amount.parse::<u64>().unwrap_or(0))
     }
 
     pub async fn start_transaction_monitor(&self) {
