@@ -1,0 +1,59 @@
+[workspace]
+members = [
+    "programs/dex_core",
+    "backend",
+    "relayer",
+    "programs/amm",
+    "programs/bridge",
+    "programs/staking",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.70.0"
+
+[workspace.dependencies]
+# Solana相关
+solana-program = "1.17"
+solana-sdk = { version = "1.17", default-features = false }
+solana-client = "1.17"
+solana-account-decoder = "1.17"
+solana-transaction-status = "1.17"
+anchor-lang = "0.29.0"
+anchor-spl = "0.29.0"
+anchor-client = "0.29.0"
+
+# 常用依赖
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+toml = "0.8"
+log = "0.4"
+env_logger = "0.10"
+uuid = { version = "1.4", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# 共享的生态系统代码
+dex_core = { path = "programs/dex_core" }
+amm = { path = "programs/amm" }
+bridge = { path = "programs/bridge" }
+staking = { path = "programs/staking" }
+relayer = { path = "relayer" }
+backend = { path = "backend" }
+
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.test]
+opt-level = 0
+debug = true

@@ -1,0 +1,40 @@
+[package]
+name = "amm"
+version = "0.1.0"
+edition = "2021"
+description = "自动做市商程序，提供链上流动性支持"
+
+[lib]
+name = "amm"
+path = "src/lib.rs"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+# Solana和Anchor依赖
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+solana-program = { workspace = true }
+
+# 共享的项目代码
+dex_core = { workspace = true }
+
+# 工具库
+arrayref = "0.3.7"
+bytemuck = { version = "1.14", features = ["derive"] }
+borsh = "0.10"
+num-derive = "0.3"
+num-traits = "0.2"
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+solana-program-test = "1.17"
+solana-sdk = { workspace = true }
+
+[features]
+default = []
+no-entrypoint = []
+cpi = ["no-entrypoint"]
+no-idl = []
+no-log-ix-name = []
+test-sbf = []

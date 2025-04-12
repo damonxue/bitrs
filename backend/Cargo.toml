@@ -1,5 +1,5 @@
 [package]
-name = "bitrs-backend"
+name = "backend"
 version = "0.1.0"
 edition = "2021"
 description = "Backend API server for BitRS distributed exchange"
@@ -8,45 +8,54 @@ description = "Backend API server for BitRS distributed exchange"
 # Web框架
 actix-web = "4.3.1"
 actix-cors = "0.6.4"
-actix = "0.13.0"  # Added for Actor support
-actix-web-actors = "4.2.0"  # Added for WebSocket support
+actix = "0.13.0"
+actix-web-actors = "4.2.0"
 
-# Solana客户端库
-solana-client = "1.16.0"
-solana-sdk = "1.16.0"
-solana-program = "1.16.0"
-solana-account-decoder = "1.16.0"  # Added for decoding Solana accounts
-solana-transaction-status = "1.16.0"  # Added for transaction status handling
-anchor-client = "0.28.0"
-anchor-lang = "0.28.0"  # Added for AccountDeserialize
+# Solana客户端库 - 使用工作区依赖
+solana-client = { workspace = true }
+solana-sdk = { workspace = true }
+solana-program = { workspace = true }
+solana-account-decoder = { workspace = true }
+solana-transaction-status = { workspace = true }
+anchor-client = { workspace = true }
+anchor-lang = { workspace = true }
+
+# 共享项目代码
+dex_core = { workspace = true }
 
 # 序列化/反序列化
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # 异步和并发
-tokio = { version = "1.28", features = ["full"] }
+tokio = { workspace = true }
 futures = "0.3"
 
 # 工具库
 dotenv = "0.15.0"
-log = "0.4"
-env_logger = "0.10.0"
-thiserror = "1.0"
-anyhow = "1.0"
-derive_more = "0.99.17"  # Added for Display derive
-chrono = "0.4"  # Added for DateTime
-uuid = { version = "1.3.0", features = ["v4"] }  # Added for UUID generation
-toml = "0.7.3"  # Added for TOML config parsing
-ring = "0.16.20"  # Added for cryptography functions
-sha2 = "0.10.6"  # Added for SHA-256 cryptographic operations
+log = { workspace = true }
+env_logger = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+derive_more = "0.99.17"
+chrono = { workspace = true }
+uuid = { workspace = true }
+toml = { workspace = true }
+ring = "0.16.20"
+sha2 = "0.10.6"
 
 # API文档
 utoipa = { version = "3.3.0", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "3.1.3", features = ["actix-web"] }
 
 # 数据库连接（可选，用于持久化）
-sqlx = { version = "0.6", features = ["runtime-tokio", "postgres", "chrono", "json"], optional = true }
+sqlx = { version = "0.7", features = [
+    "runtime-tokio",
+    "postgres",
+    "chrono",
+    "json",
+    "uuid",
+], optional = true }
 
 [features]
 default = []
